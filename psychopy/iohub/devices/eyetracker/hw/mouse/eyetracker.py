@@ -18,40 +18,40 @@ class EyeTracker(EyeTrackerDevice):
     as a kwarg passed to launchHubServer::
 
         eyetracker.hw.mouse.EyeTracker
-              
+
     Examples:
         A. Start ioHub with the Mouse Simulated eye tracker::
-    
+
             from psychopy.iohub import launchHubServer
             from psychopy.core import getTime, wait
 
             iohub_config = {'eyetracker.hw.mouse.EyeTracker': {}}
-                
+
             io = launchHubServer(**iohub_config)
-            
+
             # Get the eye tracker device.
             tracker = io.devices.tracker
-            
+
         B. Print all eye tracker events received for 2 seconds::
-                        
+
             # Check for and print any eye tracker events received...
             tracker.setRecordingState(True)
-            
+
             stime = getTime()
             while getTime()-stime < 2.0:
                 for e in tracker.getEvents():
                     print(e)
-            
+
         C. Print current eye position for 5 seconds::
-                        
+
             # Check for and print current eye position every 100 msec.
             stime = getTime()
             while getTime()-stime < 5.0:
                 print(tracker.getPosition())
                 wait(0.1)
-            
+
             tracker.setRecordingState(False)
-            
+
             # Stop the ioHub Server
             io.quit()
     """
@@ -71,7 +71,7 @@ class EyeTracker(EyeTrackerDevice):
     _eye_state = "NONE"
     _last_mouse_event_time = 0
     _ISI = 0.01  # Later set by runtime_settings.sampling_rate
-    _saccade_threshold = 0.5 # Later set by runtime_settings.sampling_rate
+    _saccade_threshold = 0.5  # Later set by runtime_settings.sampling_rate
     _move_eye_buttons = [False, False, False]
     _blink_eye_buttons = [False, False, False]
     _last_event_start = 0.0
@@ -169,7 +169,7 @@ class EyeTracker(EyeTrackerDevice):
                         else:
                             self._latest_gaze_position = self._ioMouse.getPosition()
 
-                if self._eye_state not in ["FIX","SACC"] and self._latest_gaze_position:
+                if self._eye_state not in ["FIX", "SACC"] and self._latest_gaze_position:
                     # Fixation start
                     self._addFixationEvent(True)
                 elif self._eye_state == "FIX" and create_blink_start:
@@ -197,7 +197,7 @@ class EyeTracker(EyeTrackerDevice):
             EyeTracker._last_event_start = stime
             sacc_amp_xy = math.fabs(math.hypot(*EyeTracker._sacc_amplitude))
             saccade_duration = 2.2 * sacc_amp_xy + 21.0
-            saccade_duration = saccade_duration/1000.0 # convert to seconds
+            saccade_duration = saccade_duration / 1000.0  # convert to seconds
             EyeTracker._sacc_end_time = stime + saccade_duration
             EyeTracker._last_start_event_pos = sacc_start_pos
             self._latest_gaze_position = sacc_end_pos
@@ -215,9 +215,9 @@ class EyeTracker(EyeTrackerDevice):
             eye_evt = [0, 0, 0, Device._getNextEventID(), EventConstants.SACCADE_END,
                        end_event_time, end_event_time, end_event_time, 0, 0, 0, EyeTrackerConstants.RIGHT_EYE,
                        event_duration,
-                       EyeTracker._sacc_amplitude[0], # e_amp[0],
-                       EyeTracker._sacc_amplitude[1], # e_amp[1],
-                       0, # e_angle,
+                       EyeTracker._sacc_amplitude[0],  # e_amp[0],
+                       EyeTracker._sacc_amplitude[1],  # e_amp[1],
+                       0,  # e_angle,
                        s_gaze[0], s_gaze[1],
                        ET_UNDEFINED, ET_UNDEFINED, ET_UNDEFINED, ET_UNDEFINED, ET_UNDEFINED,
                        s_pupilsize, EyeTrackerConstants.PUPIL_DIAMETER_MM,
@@ -408,8 +408,8 @@ class EyeTracker(EyeTrackerDevice):
         cal_run = calibration.runCalibration()
         calibration.window.close()
 
-        # NOTE - The following line has been commented out to prevent ioHub from 
-        # losing keyboard input after the window is closed. The new keyboard 
+        # NOTE - The following line has been commented out to prevent ioHub from
+        # losing keyboard input after the window is closed. The new keyboard
         # input system does not require this call anymore.
         # calibration._unregisterEventMonitors()
         calibration.clearAllEventBuffers()

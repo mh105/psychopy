@@ -5,6 +5,7 @@
 
 from psychopy.iohub.devices.eyetracker.calibration import BaseCalibrationProcedure
 
+
 class MouseGazeCalibrationProcedure(BaseCalibrationProcedure):
     def __init__(self, eyetrackerInterface, calibration_args):
         BaseCalibrationProcedure.__init__(self, eyetrackerInterface, calibration_args, allow_escape_in_progress=True)
