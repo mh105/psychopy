@@ -71,6 +71,7 @@ class BaseCalibrationProcedure:
             units=unit_type,
             fullscr=True,
             allowGUI=False,
+            checkTiming=False,
             screen=display.getIndex(),
             color=self.getCalibSetting(['screen_background_color']),
             colorSpace=color_type)
