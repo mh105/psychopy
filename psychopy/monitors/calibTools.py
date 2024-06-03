@@ -116,13 +116,13 @@ class Monitor:
         self._loadAll()
         if len(self.calibNames) > 0:
             self.setCurrent(-1)  # will fetch previous vals if monitor exists
-            if self.autoLog:
-                logging.info('Loaded monitor calibration from %s' %
-                             self.calibNames)
+            # if self.autoLog:
+            #     logging.info('Loaded monitor calibration from %s' %
+            #                  self.calibNames)
         else:
             self.newCalib()
-            logging.warning("Monitor specification not found. "
-                            "Creating a temporary one...")
+            # logging.warning("Monitor specification not found. "
+            #                 "Creating a temporary one...")
 
         # override current monitor settings with the vals given
         if width:
