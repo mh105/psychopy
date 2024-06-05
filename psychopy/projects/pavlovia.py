@@ -1552,12 +1552,12 @@ def getProject(filename):
                                                    "but no user is logged in for us to check it".format(url)))
                     return proj
 
-            if proj is None:
-                # Warn user if still no project
-                logging.warning("We found a repository at {} but it "
-                                "doesn't point to gitlab.pavlovia.org. "
-                                "You could create that as a remote to "
-                                "sync from PsychoPy.".format(gitRoot))
+            # if proj is None:
+            #     # Warn user if still no project
+            #     logging.warning("We found a repository at {} but it "
+            #                     "doesn't point to gitlab.pavlovia.org. "
+            #                     "You could create that as a remote to "
+            #                     "sync from PsychoPy.".format(gitRoot))
 
 
 global _existingSession
