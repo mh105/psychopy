@@ -183,7 +183,7 @@ class Window():
                  stereo=False,
                  name='window1',
                  title="PsychoPy",
-                 checkTiming=True,
+                 checkTiming=False,
                  useFBO=False,
                  useRetina=True,
                  autoLog=True,
