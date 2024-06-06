@@ -1501,7 +1501,7 @@ def getProject(filename):
             return None
     elif gitRoot:
         # Existing repo but not in our knownProjects. Investigate
-        logging.info("Investigating repo at {}".format(gitRoot))
+        # logging.info("Investigating repo at {}".format(gitRoot))
         localRepo = git.Repo(gitRoot)
         for remote in localRepo.remotes:
             for url in remote.urls:
