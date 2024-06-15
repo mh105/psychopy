@@ -106,7 +106,8 @@ class EyetrackerCalibration:
         if tracker == 'eyetracker.hw.sr_research.eyelink.EyeTracker':
             if self.movementAnimation:
                 # Alert user that their animation params aren't used
-                alert(code=4520, strFields={"brand": "EyeLink"})
+                # alert(code=4520, strFields={"brand": "EyeLink"})
+                pass
 
         elif tracker == 'eyetracker.hw.gazepoint.gp3.EyeTracker':
             if not self.progressMode == "time":
