@@ -558,6 +558,9 @@ class PsychoPyApp(wx.App, handlers.ThemeMixin):
         if runlist and "runner" not in startView:
             startView.append("runner")
 
+        # Force start view to open builder and runner
+        startView = ["builder", "runner"]
+
         # create windows
         if "runner" in startView:
             # open Runner if requested
