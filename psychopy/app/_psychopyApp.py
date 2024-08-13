@@ -546,7 +546,11 @@ class PsychoPyApp(wx.App, handlers.ThemeMixin):
             if arg.endswith(".psyexp"):
                 exps.append(arg)
             if arg.endswith(".py"):
-                scripts.append(arg)
+                if sys.platform == 'darwin' and arg.endswith("psychopyApp.py"):
+                    # in wx4 on mac this is called erroneously by App.__init__
+                    continue
+                else:
+                    scripts.append(arg)
             if "runner" not in startView and arg.endswith(".psyrun"):
                 runlist.append(arg)
         
@@ -557,9 +561,6 @@ class PsychoPyApp(wx.App, handlers.ThemeMixin):
             startView.append("coder")
         if runlist and "runner" not in startView:
             startView.append("runner")
-
-        # Force start view to open builder and runner
-        startView = ["builder", "runner"]
 
         # create windows
         if "runner" in startView:
