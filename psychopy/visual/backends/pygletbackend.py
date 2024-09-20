@@ -179,20 +179,27 @@ class PygletBackend(BaseBackend):
                     'integer greater than two. Disabling.')
                 win.multiSample = False
 
+        skip_screen_warn = False
         if platform.system() == 'Linux':
-            display = pyglet.canvas.Display()
+            from pyglet.canvas.xlib import NoSuchDisplayException
+            try:
+                display = pyglet.canvas.Display(x_screen=win.screen)
+                # in this case, we'll only get a single x-screen back
+                skip_screen_warn = True
+            except NoSuchDisplayException:
+                # Maybe xinerama? Try again and get the specified screen later
+                display = pyglet.canvas.Display(x_screen=0)
+
             allScrs = display.get_screens()
         else:
-            if pyglet.version < '1.4':
-                allScrs = _default_display_.get_screens()
-            else:
-                allScrs = _default_display_.get_screens()
+            allScrs = _default_display_.get_screens()
 
-        # Screen (from Exp Settings) is 1-indexed,
+        # Screen (from Exp Settings) is 0-indexed,
         # so the second screen is Screen 1
         if len(allScrs) < int(win.screen) + 1:
-            logging.warn("Requested an unavailable screen number - "
-                         "using first available.")
+            if not skip_screen_warn:
+                logging.warn("Requested an unavailable screen number - "
+                             "using first available.")
             thisScreen = allScrs[0]
         else:
             thisScreen = allScrs[win.screen]
@@ -247,7 +254,7 @@ class PygletBackend(BaseBackend):
             self.winHandle = pyglet.window.Window(
                 width=w, height=h,
                 caption="PsychoPy",
-                fullscreen=self._isFullScr,
+                fullscreen=win._isFullScr,
                 config=config,
                 screen=thisScreen,
                 style=style)
@@ -258,8 +265,12 @@ class PygletBackend(BaseBackend):
                 "graphics card and/or graphics drivers.")
         try:
             icns = [
-                pyglet.image.load(prefs.paths['resources'] + os.sep + "Psychopy Window Favicon@16w.png"),
-                pyglet.image.load(prefs.paths['resources'] + os.sep + "Psychopy Window Favicon@32w.png"),
+                pyglet.image.load(
+                    prefs.paths['assets'] + os.sep + "Psychopy Window Favicon@16w.png"
+                ),
+                pyglet.image.load(
+                    prefs.paths['assets'] + os.sep + "Psychopy Window Favicon@32w.png"
+                ),
             ]
             self.winHandle.set_icon(*icns)
         except BaseException:
@@ -293,6 +304,23 @@ class PygletBackend(BaseBackend):
             except Exception:
                 # pyglet 1.2 with 64bit python?
                 win._hw_handle = self.winHandle._nswindow.windowNumber()
+            # Here we temporarily set the window to the bottom right corner of the
+            # requested screen so the correct screen is always detected for NSWindow.
+            # The actual location is then set below using the pyglet set_location()
+            # method on the CocoaWindow object that wraps the NSWindow as _nswindow.
+            # This is necessary because NSScreen origin is the bottom left corner of
+            # the unshifted main screen and positive up, while pyglet origin is the top
+            # left corner of the shifted main screen and positive down. If thisScreen is
+            # not the main screen, we need to prevent self.winHandle._nswindow.screen()
+            # from returning None, which can happen when the c binding returns nil if the
+            # window is offscreen as a result of flipped y values of origins beween pyglet
+            # and NSWindow coordinate systems.
+            from pyglet.libs.darwin import cocoapy
+            mainScreen_y_from_NSOrigin = allScrs[0].y + allScrs[0].height
+            thisScreen_y_from_NSOrigin = thisScreen.y + thisScreen.height
+            thisScreen_y = mainScreen_y_from_NSOrigin - thisScreen_y_from_NSOrigin
+            temp_origin = cocoapy.NSPoint(thisScreen.x, thisScreen_y)
+            self.winHandle._nswindow.setFrameOrigin_(temp_origin)
         elif sys.platform.startswith('linux'):
             win._hw_handle = self.winHandle._window
             self._frameBufferSize = win.clientSize
@@ -334,21 +362,22 @@ class PygletBackend(BaseBackend):
             # (but need to alter x,y handling then)
             self.winHandle.set_mouse_visible(False)
         if not win.pos:
-            # work out where the centre should be
-            if win.useRetina:
-                win.pos = [(thisScreen.width - win.clientSize[0]/2) / 2,
-                           (thisScreen.height - win.clientSize[1]/2) / 2]
-            else:
-                win.pos = [(thisScreen.width - win.clientSize[0]) / 2,
-                           (thisScreen.height - win.clientSize[1]) / 2]
-        if not win._isFullScr:
+            # work out the location of the top-left corner to place at the screen center
+            win.pos = [(thisScreen.width - win.clientSize[0]) / 2,
+                       (thisScreen.height - win.clientSize[1]) / 2]
+        if sys.platform == 'darwin':
+            # always need to set the cocoa window location due to origin changes
+            screenHeight_offset = thisScreen.height - allScrs[0].height
+            self.winHandle.set_location(int(win.pos[0] + thisScreen.x),
+                                        int(win.pos[1] + thisScreen.y + screenHeight_offset))
+        elif not win._isFullScr:
             # add the necessary amount for second screen
             self.winHandle.set_location(int(win.pos[0] + thisScreen.x),
                                         int(win.pos[1] + thisScreen.y))
 
         try:  # to load an icon for the window
-            iconFile = os.path.join(psychopy.prefs.paths['resources'],
-                                    'psychopy.ico')
+            iconFile = os.path.join(psychopy.prefs.paths['assets'],
+                                    'window.ico')
             icon = pyglet.image.load(filename=iconFile)
             self.winHandle.set_icon(icon)
         except Exception:

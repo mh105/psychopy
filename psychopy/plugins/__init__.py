@@ -29,9 +29,7 @@ import sys
 import inspect
 import collections
 import hashlib
-import importlib
-import pathlib
-import pkg_resources
+import importlib, importlib.metadata
 from psychopy import logging
 from psychopy.preferences import prefs
 
@@ -39,12 +37,10 @@ from psychopy.preferences import prefs
 # user-installed packages (i.e. plugins).
 USER_PACKAGES_PATH = str(prefs.paths['userPackages'])
 # check if we're in a virtual environment or not
-inVM = hasattr(sys, 'real_prefix') or sys.prefix != sys.base_prefix
-if not inVM and USER_PACKAGES_PATH not in pkg_resources.working_set.entries:
-    pkg_resources.working_set.add_entry(USER_PACKAGES_PATH)
+inVenv = hasattr(sys, 'real_prefix') or sys.prefix != sys.base_prefix
 
 # add the plugins folder to the path
-if not inVM and USER_PACKAGES_PATH not in sys.path:
+if not inVenv and USER_PACKAGES_PATH not in sys.path:
     sys.path.insert(0, USER_PACKAGES_PATH)  # add to path
 
 # Keep track of plugins that have been loaded. Keys are plugin names and values
@@ -63,6 +59,40 @@ _failed_plugins_ = []
 # ------------------------------------------------------------------------------
 # Functions
 #
+
+def getEntryPointGroup(group, subgroups=False):
+    """
+    Get all entry points which target a specific group.
+
+    Parameters
+    ----------
+    group : str
+        Group to look for (e.g. "psychopy.experiment.components" for plugin Components)
+    subgroups : bool
+        If True, then will also look for subgroups (e.g. "psychopy.experiment" will also return
+        entry points for "psychopy.experiment.components")
+
+    Returns
+    -------
+    list[importlib.metadata.Entrypoint]
+        List of EntryPoint objects for the given group
+    """
+    # start off with no entry points or sections
+    entryPoints = []
+
+    if subgroups:
+        # if searching subgroups, iterate through entry point groups
+        for thisGroup, eps in importlib.metadata.entry_points().items():
+            # get entry points within matching group
+            if thisGroup.startswith(group):
+                # add to list of all entry points
+                entryPoints += eps
+    else:
+        # otherwise, just get the requested group
+        entryPoints += importlib.metadata.entry_points().get(group, [])
+
+    return entryPoints
+
 
 def resolveObjectFromName(name, basename=None, resolve=True, error=True):
     """Get an object within a module's namespace using a fully-qualified or
@@ -257,7 +287,7 @@ def getBundleInstallTarget(projectName):
 
     """
     return os.path.join(
-        prefs.paths['packages'], pkg_resources.safe_name(projectName))
+        prefs.paths['packages'], projectName)
 
 
 def refreshBundlePaths():
@@ -288,12 +318,18 @@ def refreshBundlePaths():
     pluginTopLevelDirs = os.listdir(pluginBaseDir)
     for pluginDir in pluginTopLevelDirs:
         fullPath = os.path.join(pluginBaseDir, pluginDir)
-        allDists = pkg_resources.find_distributions(fullPath, only=False)
+        allDists = importlib.metadata.distributions(path=pluginDir)
         if not allDists:  # no packages found, move on
             continue
 
         # does the sud-directory contain an appropriately named distribution?
-        validDist = any([dist.project_name == pluginDir for dist in allDists])
+        validDist = False
+        for dist in allDists:
+            if sys.version.startswith("3.8"):
+                distName = dist.metadata['name']
+            else:
+                distName = dist.name
+            validDist = validDist or distName == pluginDir
         if not validDist:
             continue
 
@@ -304,10 +340,39 @@ def refreshBundlePaths():
         foundBundles.append(pluginDir)
 
     # refresh package index since the working set is now stale
-    import psychopy.tools.pkgtools as pkgtools
-    pkgtools.refreshPackages()
+    scanPlugins()
 
     return foundBundles
+
+
+def getPluginConfigPath(plugin):
+    """Get the path to the configuration file for a plugin.
+
+    This function returns the path to folder alloted to a plugin for storing
+    configuration files. This is useful for plugins that require user settings
+    to be stored in a file.
+
+    Parameters
+    ----------
+    plugin : str
+        Name of the plugin package to get the configuration file for.
+
+    Returns
+    -------
+    str
+        Path to the configuration file for the plugin.
+
+    """
+    # check if the plugin is installed first
+    if plugin not in _installed_plugins_:
+        raise ValueError("Plugin `{}` is not installed.".format(plugin))
+    
+    # get the config directory
+    import pathlib
+    configDir = pathlib.Path(prefs.paths['configs']) / 'plugins' / plugin
+    configDir.mkdir(parents=True, exist_ok=True)
+
+    return configDir
 
 
 def installPlugin(package, local=True, upgrade=False, forceReinstall=False,
@@ -331,7 +396,7 @@ def installPlugin(package, local=True, upgrade=False, forceReinstall=False,
 
     """
     # determine where to install the package
-    installWhere = getBundleInstallTarget(package) if local else None
+    installWhere = USER_PACKAGES_PATH if local else None
     import psychopy.tools.pkgtools as pkgtools
     pkgtools.installPackage(
         package, 
@@ -360,20 +425,25 @@ def scanPlugins():
     """
     global _installed_plugins_
     _installed_plugins_ = {}  # clear the cache
-    for dist in pkg_resources.find_distributions(USER_PACKAGES_PATH):
-        if dist.has_metadata('entry_points.txt'):
-            entryMap = dist.get_entry_map()
-            if entryMap:
-                _installed_plugins_[dist.project_name] = entryMap
+    # iterate through installed packages
+    for dist in importlib.metadata.distributions(path=sys.path + [USER_PACKAGES_PATH]):
+        # map all entry points
+        for ep in dist.entry_points:
+            # skip entry points which don't target PsychoPy
+            if not ep.group.startswith("psychopy"):
+                continue
+            # make sure we have an entry for this distribution
+            if sys.version.startswith("3.8"):
+                distName = dist.metadata['name']
             else:
-                logging.warning(
-                    "Package `{}` has an empty entry points map!".format(
-                        dist.project_name))
-        else:
-            logging.debug(
-                "Package `{}` does not define any entry points.".format(
-                    dist.project_name))
-    
+                distName = dist.name
+            if distName not in _installed_plugins_:
+                _installed_plugins_[distName] = {}
+            # make sure we have an entry for this group
+            if ep.group not in _installed_plugins_[distName]:
+                _installed_plugins_[distName][ep.group] = {}
+            # map entry point
+            _installed_plugins_[distName][ep.group][ep.name] = ep
     return len(_installed_plugins_)
 
 
@@ -501,51 +571,6 @@ def isStartUpPlugin(plugin):
 
     """
     return plugin in listPlugins(which='startup')
-
-
-def loadPluginBuilderElements(plugin):
-    """
-    Load entry points from plugin which are relevant to Builder, e.g.
-    Component/Routine extensions for listing available hardware backends.
-
-    Parameters
-    ----------
-    plugin : str
-        Name of the plugin package to load. This usually refers to the package
-        or project name.
-
-    Returns
-    -------
-    bool
-        `True` if successful, `False` if failed.
-    """
-    # if plugin has already failed to load once, don't try again
-    if plugin in _failed_plugins_:
-        return False
-    # get entry points for plugin
-    ep = pluginEntryPoints(plugin)
-    # define modules in which entry points are relevant to Builder
-    modules = (
-        "psychopy.experiment.routines",
-        "psychopy.experiment.components",
-    )
-    # get any points pointing to these modules
-    relevantPoints = []
-    for mod in modules:
-        pts = ep.get(mod, {})
-        relevantPoints += list(pts.values())
-    # import all relevant classes
-    for point in relevantPoints:
-        try:
-            importlib.import_module(point.module_name)
-            return True
-        except:
-            # if import failed for any reason, log error and mark failure
-            logging.error(
-                f"Failed to load {point.module_name}.{point.name} from plugin {plugin}."
-            )
-            _failed_plugins_.append(plugin)
-            return False
 
 
 def loadPlugin(plugin):
@@ -690,26 +715,43 @@ def loadPlugin(plugin):
         # that the entry points are valid. This prevents plugins from being
         # partially loaded which can cause all sorts of undefined behaviour.
         for attr, ep in attrs.items():
+            try:
+                # parse the module name from the entry point value
+                if ':' in ep.value:
+                    module_name, _ = ep.value.split(':', 1)
+                else:
+                    module_name = ep.value
+                module_name = module_name.split(".")[0]
+            except ValueError:
+                logging.error(
+                    "Plugin `{}` entry point `{}` is not formatted correctly. "
+                    "Skipping.".format(plugin, ep))
+
+                if plugin not in _failed_plugins_:
+                    _failed_plugins_.append(plugin)
+
+                return False
+
             # Load the module the entry point belongs to, this happens
             # anyways when .load() is called, but we get to access it before
             # we start binding. If the module has already been loaded, don't
             # do this again.
-            if ep.module_name not in sys.modules:
+            if module_name not in sys.modules:
                 # Do stuff before loading entry points here, any executable code
                 # in the module will run to configure it.
                 try:
-                    imp = importlib.import_module(ep.module_name)
+                    imp = importlib.import_module(module_name)
                 except (ModuleNotFoundError, ImportError):
                     importSuccess = False
                     logging.error(
                         "Plugin `{}` entry point requires module `{}`, but it "
-                        "cannot be imported.".format(plugin, ep.module_name))
+                        "cannot be imported.".format(plugin, module_name))
                 except:
                     importSuccess = False
                     logging.error(
                         "Plugin `{}` entry point requires module `{}`, but an "
                         "error occurred while loading it.".format(
-                            plugin, ep.module_name))
+                            plugin, module_name))
                 else:
                     importSuccess = True
 
@@ -738,21 +780,18 @@ def loadPlugin(plugin):
                     # return False
             try:
                 ep = ep.load()  # load the entry point
+
+                # Raise a warning if the plugin is being loaded from a zip file.
+                if '.zip' in inspect.getfile(ep):
+                    logging.warning(
+                        "Plugin `{}` is being loaded from a zip file. This may "
+                        "cause issues with the plugin's functionality.".format(plugin))
+
             except ImportError as e:
                 logging.error(
                     "Failed to load entry point `{}` of plugin `{}`. "
                     "(`{}: {}`) "
                     "Skipping.".format(str(ep), plugin, e.name, e.msg))
-
-                if plugin not in _failed_plugins_:
-                    _failed_plugins_.append(plugin)
-
-                return False
-            except pkg_resources.DistributionNotFound:
-                logging.error(
-                    "Failed to load entry point `{}` of plugin `{}` due to "
-                    "missing distribution required by the application."
-                    "Skipping.".format(str(ep), plugin))
 
                 if plugin not in _failed_plugins_:
                     _failed_plugins_.append(plugin)
@@ -780,7 +819,7 @@ def loadPlugin(plugin):
             # add the object to the module or unbound class
             setattr(targObj, attr, ep)
             logging.debug(
-                "Assigning to entry point `{}` to `{}`.".format(
+                "Assigning the entry point `{}` to `{}`.".format(
                     ep.__name__, fqn + '.' + attr))
 
             # --- handle special cases ---
@@ -992,18 +1031,8 @@ def pluginMetadata(plugin):
             "Plugin `{}` is not installed or does not have entry points for "
             "PsychoPy.".format(plugin))
 
-    pkg = pkg_resources.get_distribution(plugin)
-    metadata = pkg.get_metadata(pkg.PKG_INFO)
-
-    metadict = {}
-    for line in metadata.split('\n'):
-        if not line:
-            continue
-
-        line = line.strip().split(': ')
-        if len(line) == 2:
-            field, value = line
-            metadict[field] = value
+    pkg = importlib.metadata.distribution(plugin)
+    metadict = dict(pkg.metadata)
 
     return metadict
 
@@ -1074,7 +1103,6 @@ def activatePlugins(which='all'):
     # load each plugin and apply any changes to Builder
     for plugin in listPlugins(which):
         loadPlugin(plugin)
-        loadPluginBuilderElements(plugin)
 
 
 # Keep track of currently installed window backends. When a window is loaded,
