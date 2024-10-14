@@ -317,6 +317,30 @@ class ScriptProcess:
                 self.expCtrl.Select(itemIdx)
                 self.toolbar.buttons['runBtn'].Disable()
 
+        # AlexHe's code to copy over last_app_load.log
+        from psychopy.preferences import prefs
+        prefLogFilePath = os.path.join(prefs.paths['userPrefsDir'], 'last_app_load.log')
+        if os.path.exists(prefLogFilePath):
+            # Define the target string to search for
+            target_string = 'target_last_app_load_log_file:'
+            target_last_app_load_file = None
+            # Open the log file for reading
+            with open(prefLogFilePath, 'r') as log_file:
+                # Iterate through each line in the log file
+                for line in log_file:
+                    # Check if the target string is in the current line
+                    if target_string in line:  # the latest line with the target string will be used
+                        # Extract the rest of the line after the target string
+                        target_last_app_load_file = line.split(target_string, 1)[-1].strip()
+            if target_last_app_load_file:
+                import shutil
+                shutil.copy(prefLogFilePath, target_last_app_load_file)
+                logging.info(f"Successfully copied {prefLogFilePath} to {target_last_app_load_file}")
+            else:
+                logging.warn(f"Could not find target_last_app_load_log_file in {prefLogFilePath}")
+        else:
+            logging.error(f"Could not find last_app_load.log at {prefLogFilePath}")
+
         def _focusOnOutput(win):
             """Subroutine to focus on a given output window."""
             win.Show()

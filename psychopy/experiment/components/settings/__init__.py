@@ -1330,7 +1330,12 @@ class SettingsComponent:
         )
         buff.writeIndentedLines(code)
         buff.setIndentLevel(+1, relative=True)
-
+        # write down a destination filename for copying last_app_load.log (AlexHe's code)
+        code = (
+            "# log the filename of last_app_load.log\n"
+            "print('target_last_app_load_log_file: ' + filename + '_last_app_load.log')\n"
+        )
+        buff.writeIndentedLines(code)
         # set app logging level
         code = (
             "# set how much information should be printed to the console / app\n"
