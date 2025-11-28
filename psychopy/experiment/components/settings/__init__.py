@@ -107,6 +107,7 @@ class SettingsComponent:
             elLiveFiltering="FILTER_LEVEL_OFF", elDataFiltering="FILTER_LEVEL_2",
             elTrackingMode='PUPIL_CR_TRACKING', elPupilMeasure='PUPIL_AREA', elPupilAlgorithm='ELLIPSE_FIT',
             elAddress='100.1.1.1',
+            elEDFFileName="EXPFILE",
             tbModel="", tbLicenseFile="", tbSerialNo="", tbSampleRate=60,
             plPupillometryOnly=False,
             plSurfaceName="psychopy_iohub_surface",
@@ -529,7 +530,7 @@ class SettingsComponent:
         # Eyetracking params
         self.order += ["eyetracker",
                        "gpAddress", "gpPort",
-                       "elModel", "elAddress", "elSimMode"]
+                       "elModel", "elAddress", "elEDFFileName", "elSimMode"]
 
         # Hide params when not relevant to current eyetracker
         trackerParams = {
@@ -537,7 +538,8 @@ class SettingsComponent:
             "GazePoint": ["gpAddress", "gpPort"],
             "SR Research Ltd": ["elModel", "elSimMode", "elSampleRate", "elTrackEyes", "elLiveFiltering",
                                 "elDataFiltering", "elTrackingMode", "elPupilMeasure", "elPupilAlgorithm",
-                                "elAddress"],
+                                "elAddress",
+                                'elEDFFileName'],
             "Tobii Technology": ["tbModel", "tbLicenseFile", "tbSerialNo", "tbSampleRate"],
             "Pupil Labs": ["plPupillometryOnly", "plSurfaceName", "plConfidenceThreshold",
                            "plPupilRemoteAddress", "plPupilRemotePort", "plPupilRemoteTimeoutMs",
@@ -675,6 +677,12 @@ class SettingsComponent:
             elAddress, valType='str', inputType="single",
             hint=_translate("IP Address of the EyeLink *Host* computer."),
             label=_translate("EyeLink IP address"), categ="Eyetracking"
+        )
+
+        self.params['elEDFFileName'] = Param(
+            elEDFFileName, valType='str', inputType="single",
+            hint=_translate("Name of the EDF file on the EyeLink *Host* computer."),
+            label=_translate("EDF file name"), categ="Eyetracking"
         )
 
         # tobii
@@ -1532,7 +1540,7 @@ class SettingsComponent:
                     "'model_name': %(elModel)s,\n"
                     "'simulation_mode': %(elSimMode)s,\n"
                     "'network_settings': %(elAddress)s,\n"
-                    "'default_native_data_file_name': 'EXPFILE',\n"
+                    "'default_native_data_file_name': %(elEDFFileName)s,\n"
                     "'runtime_settings': {\n"
                 )
                 buff.writeIndentedLines(code % inits)
