@@ -145,7 +145,7 @@ class Polygon(BaseShapeStim):
         self._initParams.remove('self')
 
         self.autoLog = False  # but will be changed if needed at end of init
-        self.__dict__['edges'] = edges
+        self.__dict__['edges'] = edges if edges is not None else 3
         self.__dict__['lineWidth'] = lineWidth
         self.radius = np.asarray(radius)
         self._calcVertices()
@@ -223,7 +223,9 @@ class Polygon(BaseShapeStim):
 
     def setNVertices(self, nVerts, operation='', log=None):
         """
-        Usually you can use 'stim.attribute = value' syntax instead,
-        but use this method if you need to suppress the log message
+        Setting the number of vertices in a polygon should be done via changing
+        the `edges` attribute, not the `vertices` attribute. This method is updated
+        for backward compatibility.
         """
-        setAttribute(self, 'vertices', nVerts, log, operation)
+        # setAttribute(self, 'vertices', nVerts, log, operation)
+        self.setEdges(nVerts, operation=operation, log=log)
