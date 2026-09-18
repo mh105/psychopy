@@ -12,6 +12,7 @@ import json
 import pathlib
 import os
 import re
+import sys
 import time
 import subprocess
 import traceback
@@ -27,6 +28,12 @@ import wx
 
 from ..app.errorDlg import exceptionCallback
 from ..tools.apptools import SortTerm
+
+# Use Git directly to bypass the Intel/ARM mismatch in Apple's Git launcher.
+if sys.platform == 'darwin':
+    _gitBin = "/Library/Developer/CommandLineTools/usr/bin"
+    os.environ["GIT_PYTHON_GIT_EXECUTABLE"] = os.path.join(_gitBin, "git")
+    os.environ["PATH"] = _gitBin + os.pathsep + os.environ.get("PATH", "")
 
 try:
     import git  # must import psychopy constants before this (custom git path)
